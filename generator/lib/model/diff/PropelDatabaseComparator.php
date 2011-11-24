@@ -82,16 +82,17 @@ class PropelDatabaseComparator
 	 * @param Database $toDatabase
 	 * @param  boolean $caseInsensitive Whether the comparison is case insensitive.
 	 *                                  False by default.
+	 * @param    array $ignoredTables A list of table names to ignore.
 	 *
 	 * @return PropelDatabaseDiff|boolean return false if the two databases are similar
 	 */
-	public static function computeDiff(Database $fromDatabase, Database $toDatabase, $caseInsensitive = false)
+	public static function computeDiff(Database $fromDatabase, Database $toDatabase, $caseInsensitive = false, $ignoredTables = array())
 	{
 		$dc = new self();
 		$dc->setFromDatabase($fromDatabase);
 		$dc->setToDatabase($toDatabase);
 		$differences = 0;
-		$differences += $dc->compareTables($caseInsensitive);
+		$differences += $dc->compareTables($caseInsensitive, $ignoredTables);
 
 		return ($differences > 0) ? $dc->getDatabaseDiff() : false;
 	}
@@ -103,10 +104,11 @@ class PropelDatabaseComparator
 	 *
 	 * @param  boolean $caseInsensitive Whether the comparison is case insensitive.
 	 *                                  False by default.
+	 * @param    array $ignoredTables A list of table names to ignore.
 	 *
 	 * @return integer The number of table differences
 	 */
-	public function compareTables($caseInsensitive = false)
+	public function compareTables($caseInsensitive = false, $ignoredTables = array())
 	{
 		$fromDatabaseTables = $this->fromDatabase->getTables();
 		$toDatabaseTables = $this->toDatabase->getTables();
@@ -114,6 +116,10 @@ class PropelDatabaseComparator
 
 		// check for new tables in $toDatabase
 		foreach ($toDatabaseTables as $table) {
+			if (in_array($table->getName(), $ignoredTables[$this->toDatabase->getName()])) {
+				continue;
+			}
+
 			if (!$this->fromDatabase->hasTable($table->getName(), $caseInsensitive) && !$table->isSkipSql()) {
 				$this->databaseDiff->addAddedTable($table->getName(), $table);
 				$databaseDifferences++;
@@ -122,6 +128,10 @@ class PropelDatabaseComparator
 
 		// check for removed tables in $toDatabase
 		foreach ($fromDatabaseTables as $table) {
+			if (in_array($table->getName(), $ignoredTables[$this->fromDatabase->getName()])) {
+				continue;
+			}
+
 			if (!$this->toDatabase->hasTable($table->getName(), $caseInsensitive) && !$table->isSkipSql()) {
 				$this->databaseDiff->addRemovedTable($table->getName(), $table);
 				$databaseDifferences++;
@@ -130,6 +140,10 @@ class PropelDatabaseComparator
 
 		// check for table differences
 		foreach ($fromDatabaseTables as $fromTable) {
+			if (in_array($fromTable->getName(), $ignoredTables[$this->fromDatabase->getName()])) {
+				continue;
+			}
+
 			if ($this->toDatabase->hasTable($fromTable->getName(), $caseInsensitive)) {
 				$toTable = $this->toDatabase->getTable($fromTable->getName(), $caseInsensitive);
 				$databaseDiff = PropelTableComparator::computeDiff($fromTable, $toTable, $caseInsensitive);

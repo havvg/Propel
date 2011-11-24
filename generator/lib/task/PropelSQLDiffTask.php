@@ -104,6 +104,7 @@ class PropelSQLDiffTask extends AbstractPropelDataModelTask
 		if (!$connections) {
 			throw new Exception('You must define database connection settings in a buildtime-conf.xml file to use diff');
 		}
+		$ignoredTables = $this->getIgnoredTables($generatorConfig);
 		$totalNbTables = 0;
 		$ad = new AppData();
 		foreach ($connections as $name => $params) {
@@ -148,7 +149,7 @@ class PropelSQLDiffTask extends AbstractPropelDataModelTask
 				// FIXME: tables present in database but not in XML
 				continue;
 			}
-			$databaseDiff = PropelDatabaseComparator::computeDiff($database, $appDataFromXml->getDatabase($name), $this->isCaseInsensitive());
+			$databaseDiff = PropelDatabaseComparator::computeDiff($database, $appDataFromXml->getDatabase($name), $this->isCaseInsensitive(), $ignoredTables);
 
 			if (!$databaseDiff) {
 				$this->log(sprintf('Same XML and database structures for datasource "%s" - no diff to generate', $name), Project::MSG_VERBOSE);
@@ -181,4 +182,46 @@ class PropelSQLDiffTask extends AbstractPropelDataModelTask
 			$this->log('  Once the migration class is valid, call the "migrate" task to execute it.');
 		}
 	}
+
+		/**
+		 * Retrieve a list of ignored tables given by the configuration.
+		 *
+		 * The returned list is indexed by the database and contains the list of tables to be ignored on that database.
+		 * If the configured list of tables are not namespaced by a dot the default database name will be used.
+		 *
+		 * @param GeneratorConfig $generatorConfig
+		 *
+		 * @return array
+		 */
+		public function getIgnoredTables(GeneratorConfig $generatorConfig)
+		{
+				$this->log('	Reading ignored tables...');
+
+				$tables = $generatorConfig->getBuildProperty('migrationIgnoreTables');
+				if (empty($tables)) {
+						$this->log('	No tables to be ignored.');
+						return array();
+				}
+
+				$tables = explode(',', $tables);
+				$this->log(sprintf('	%d table(s) to be ignored.', count($tables)));
+
+				$ignored = array();
+				foreach ($tables as $ignore) {
+						if (false !== strpos($ignore, '.')) {
+								list($database, $table) = explode('.', $ignore);
+						} else {
+								$database = $generatorConfig->getDefaultBuildConnectionName();
+								$table = $ignore;
+						}
+
+						if (empty($ignored[$database])) {
+								$ignored[$database] = array();
+						}
+
+						$ignored[$database][] = $table;
+				}
+
+				return $ignored;
+		}
 }

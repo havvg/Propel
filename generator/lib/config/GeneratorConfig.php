@@ -309,4 +309,9 @@ class GeneratorConfig implements GeneratorConfigInterface
 
 		return $pdo;
 	}
+
+	public function getDefaultBuildConnectionName()
+	{
+		return $this->defaultBuildConnection;
+	}
 }
